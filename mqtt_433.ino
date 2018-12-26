@@ -199,7 +199,6 @@ void reconnect() {
       client.publish("homie/nodemcu/$fw/version", "1.0", true);
       client.publish("homie/nodemcu/$nodes", "thermometer-0,thermometer-1,switch-0,switch-1,switch-2,switch-3,switch-4,switch-5", true);
       client.publish("homie/nodemcu/$implementation", "esp8266", true);
-      client.publish("homie/nodemcu/$stats/interval", String(TEMP_REQUEST_DELAY/1000).c_str(), true);
       client.publish("homie/nodemcu/$state", "ready", true);
 
       client.publish("homie/nodemcu/thermometer-0/$name", "Themometer 0", true);
@@ -244,9 +243,9 @@ void reconnect() {
       client.publish("homie/nodemcu/switch-4/power/$settable", "true", true);
       client.publish("homie/nodemcu/switch-4/power/$datatype", "boolean", true);
 
-      client.publish("homie/nodemcu/switch-5/$name", "Licht-EG_Wohnzimmer-Tiffany", true);
+      client.publish("homie/nodemcu/switch-5/$name", "Licht-EG-Wohnzimmer-Tiffany", true);
       client.publish("homie/nodemcu/switch-5/$properties", "power", true);
-      client.publish("homie/nodemcu/switch-5/power/$name", "Licht-EG_Wohnzimmer-Tiffany", true);
+      client.publish("homie/nodemcu/switch-5/power/$name", "Licht-EG-Wohnzimmer-Tiffany", true);
       client.publish("homie/nodemcu/switch-5/power/$settable", "true", true);
       client.publish("homie/nodemcu/switch-5/power/$datatype", "boolean", true);
 
@@ -290,6 +289,8 @@ void oneWireLoop() {
       Serial.println();
       client.publish(topic, tempStr, true);
     }
+    client.publish("homie/nodemcu/$stats/interval", String(TEMP_REQUEST_DELAY/1000).c_str(), true);
+    client.publish("homie/nodemcu/$stats", "uptime", true);
     client.publish("homie/nodemcu/$stats/uptime", String(uptime()).c_str(), true);
     digitalWrite(LED_BUILTIN, HIGH);
     tempReqState = TEMP_WAITING;

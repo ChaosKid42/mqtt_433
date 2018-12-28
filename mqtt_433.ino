@@ -201,51 +201,51 @@ void reconnect() {
       client.publish("homie/nodemcu/$implementation", "esp8266", true);
       client.publish("homie/nodemcu/$state", "ready", true);
 
-      client.publish("homie/nodemcu/thermometer-0/$name", "Themometer 0", true);
+      client.publish("homie/nodemcu/thermometer-0/$name", "Terrarium 1", true);
       client.publish("homie/nodemcu/thermometer-0/$properties", "temperature", true);
-      client.publish("homie/nodemcu/thermometer-0/temperature/$name", "Temperatur Themometer 0", true);
+      client.publish("homie/nodemcu/thermometer-0/temperature/$name", "Terrarium 1", true);
       client.publish("homie/nodemcu/thermometer-0/temperature/$unit", "°C", true);
       client.publish("homie/nodemcu/thermometer-0/temperature/$datatype", "float", true);
 
-      client.publish("homie/nodemcu/thermometer-1/$name", "Themometer 1", true);
+      client.publish("homie/nodemcu/thermometer-1/$name", "Terrarium 2", true);
       client.publish("homie/nodemcu/thermometer-1/$properties", "temperature", true);
-      client.publish("homie/nodemcu/thermometer-1/temperature/$name", "Temperatur Themometer 1", true);
+      client.publish("homie/nodemcu/thermometer-1/temperature/$name", "Terrarium 2", true);
       client.publish("homie/nodemcu/thermometer-1/temperature/$unit", "°C", true);
       client.publish("homie/nodemcu/thermometer-1/temperature/$datatype", "float", true);
 
-      client.publish("homie/nodemcu/switch-0/$name", "Licht-OG-Terrarien", true);
+      client.publish("homie/nodemcu/switch-0/$name", "Beleuchtung Terrarien", true);
       client.publish("homie/nodemcu/switch-0/$properties", "power", true);
-      client.publish("homie/nodemcu/switch-0/power/$name", "Licht-OG-Terrarien", true);
+      client.publish("homie/nodemcu/switch-0/power/$name", "Beleuchtung Terrarien", true);
       client.publish("homie/nodemcu/switch-0/power/$settable", "true", true);
       client.publish("homie/nodemcu/switch-0/power/$datatype", "boolean", true);
 
-      client.publish("homie/nodemcu/switch-1/$name", "Licht-EG-Flur", true);
+      client.publish("homie/nodemcu/switch-1/$name", "Licht Flur EG", true);
       client.publish("homie/nodemcu/switch-1/$properties", "power", true);
-      client.publish("homie/nodemcu/switch-1/power/$name", "Licht-EG-Flur", true);
+      client.publish("homie/nodemcu/switch-1/power/$name", "Licht Flur EG", true);
       client.publish("homie/nodemcu/switch-1/power/$settable", "true", true);
       client.publish("homie/nodemcu/switch-1/power/$datatype", "boolean", true);
 
-      client.publish("homie/nodemcu/switch-2/$name", "Licht-EG-Wohnzimmer-Stehlampe", true);
+      client.publish("homie/nodemcu/switch-2/$name", "Licht Wohnzimmer Stehlampe", true);
       client.publish("homie/nodemcu/switch-2/$properties", "power", true);
-      client.publish("homie/nodemcu/switch-2/power/$name", "Licht-EG-Wohnzimmer-Stehlampe", true);
+      client.publish("homie/nodemcu/switch-2/power/$name", "Licht Wohnzimmer Stehlampe", true);
       client.publish("homie/nodemcu/switch-2/power/$settable", "true", true);
       client.publish("homie/nodemcu/switch-2/power/$datatype", "boolean", true);
 
-      client.publish("homie/nodemcu/switch-3/$name", "Licht-OG-Flur", true);
+      client.publish("homie/nodemcu/switch-3/$name", "Licht Flur OG", true);
       client.publish("homie/nodemcu/switch-3/$properties", "power", true);
-      client.publish("homie/nodemcu/switch-3/power/$name", "Licht-OG-Flur", true);
+      client.publish("homie/nodemcu/switch-3/power/$name", "Licht Flur OG", true);
       client.publish("homie/nodemcu/switch-3/power/$settable", "true", true);
       client.publish("homie/nodemcu/switch-3/power/$datatype", "boolean", true);
 
-      client.publish("homie/nodemcu/switch-4/$name", "Licht-Baum", true);
+      client.publish("homie/nodemcu/switch-4/$name", "Weihnachtsbaum", true);
       client.publish("homie/nodemcu/switch-4/$properties", "power", true);
-      client.publish("homie/nodemcu/switch-4/power/$name", "Licht-Baum", true);
+      client.publish("homie/nodemcu/switch-4/power/$name", "Weihnachtsbaum", true);
       client.publish("homie/nodemcu/switch-4/power/$settable", "true", true);
       client.publish("homie/nodemcu/switch-4/power/$datatype", "boolean", true);
 
-      client.publish("homie/nodemcu/switch-5/$name", "Licht-EG-Wohnzimmer-Tiffany", true);
+      client.publish("homie/nodemcu/switch-5/$name", "Licht Wohnzimmer Tiffany", true);
       client.publish("homie/nodemcu/switch-5/$properties", "power", true);
-      client.publish("homie/nodemcu/switch-5/power/$name", "Licht-EG-Wohnzimmer-Tiffany", true);
+      client.publish("homie/nodemcu/switch-5/power/$name", "Licht Wohnzimmer Tiffany", true);
       client.publish("homie/nodemcu/switch-5/power/$settable", "true", true);
       client.publish("homie/nodemcu/switch-5/power/$datatype", "boolean", true);
 

@@ -6,6 +6,8 @@
 #include <DallasTemperature.h>
 #include "mqtt_433_credentials.h"
 
+#define LED_BUILTIN 2
+
 #define PIN433 15
 
 #define ONE_WIRE_BUS 2
@@ -295,8 +297,7 @@ void oneWireLoop() {
     for (int i=0; i<themoDeviceCount; i++) {
       char* topic = nNodeTopic("thermometer", i, "temperature");
       snprintf(tempStr, sizeof(tempStr), "%f", sensors.getTempC(deviceAddresses[i]));
-      Serial.printf("Publishing value %s to topic %s.", tempStr, topic);
-      Serial.println();
+      Serial.printf("Publishing value %s to topic %s.\n", tempStr, topic);
       client.publish(topic, tempStr, true);
     }
     digitalWrite(LED_BUILTIN, HIGH);

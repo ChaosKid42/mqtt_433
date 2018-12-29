@@ -15,6 +15,17 @@
 
 #define MAX_DEVICECOUNT 16
 
+#define HOMIE_DEVICE_PREFIX "homie/nodemcu"
+#define SWITCH_COUNT 6
+const char * const switchNames[SWITCH_COUNT] = {
+  "Beleuchtung Terrarien",
+  "Licht Flur EG",
+  "Licht Wohnzimmer Stehlampe",
+  "Licht Flur OG",
+  "Weihnachtsbaum",
+  "Licht Wohnzimmer Tiffany"
+};
+
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -26,11 +37,13 @@ NewRemoteTransmitter transmitter(address_433, PIN433, 260, 3);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 DeviceAddress *deviceAddresses = new DeviceAddress[MAX_DEVICECOUNT];
-unsigned int deviceCount = 0;
+unsigned int themoDeviceCount = 0;
 unsigned int  maxResolution = 0;
 unsigned long lastTempRequest = 0;
 unsigned int delayInMillis = 0;
 unsigned int tempReqState = TEMP_WAITING;
+
+char topicTempString[100];
 
 uint32_t uptime() {
     static uint32_t low32, high32;
@@ -67,10 +80,10 @@ void printAddress(DeviceAddress deviceAddress)
 void setup_onewire() {
   sensors.begin();
   Serial.print("Locating devices...Found ");
-  deviceCount = _min(sensors.getDeviceCount(), MAX_DEVICECOUNT);
-  Serial.print(deviceCount);
+  themoDeviceCount = _min(sensors.getDeviceCount(), MAX_DEVICECOUNT);
+  Serial.print(themoDeviceCount);
   Serial.println(" devices.");
-  for (int i=0; i<deviceCount; i++) {
+  for (int i=0; i<themoDeviceCount; i++) {
     sensors.getAddress(deviceAddresses[i], i);
     Serial.printf("Device %d Address: ", i);
     printAddress(deviceAddresses[i]);
@@ -138,7 +151,6 @@ void lightShow() {
   digitalWrite(LED_BUILTIN, HIGH);  
 }
 
-
 void execSwitchCmd(byte unit, boolean switchOn, char* topic) {
     Serial.printf("send to unit %d: %d", unit, switchOn);
     Serial.println();
@@ -151,6 +163,18 @@ void execSwitchCmd(byte unit, boolean switchOn, char* topic) {
     digitalWrite(LED_BUILTIN, HIGH);
 }
 
+char* deviceTopic(const char* postfix) {
+  // e.g. "homie/nodemcu/$implementation"
+  snprintf(topicTempString, sizeof(topicTempString), "%s/%s", HOMIE_DEVICE_PREFIX, postfix);
+  return topicTempString;
+}
+
+char* nNodeTopic(const char* node, unsigned int i, const char* postfix) {
+  // e.g. "homie/nodemcu/switch-0/power/set"
+  snprintf(topicTempString, sizeof(topicTempString), "%s/%s-%d/%s", HOMIE_DEVICE_PREFIX, node, i, postfix);
+  return topicTempString;
+}
+
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.printf("Message arrived with length %d [", length);
   Serial.print(topic);
@@ -160,23 +184,64 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
   Serial.println();
 
-  if (strcmp(topic, "homie/nodemcu/switch-0/power/set") == 0)
-    execSwitchCmd(15, (char)payload[0] == 't', "homie/nodemcu/switch-0/power");
+  for (int i = 0; i < SWITCH_COUNT; i++) {
+    if (strcmp(topic, nNodeTopic("switch", i, "power/set")) == 0) {
+      execSwitchCmd(15-i, (char)payload[0] == 't', nNodeTopic("switch", i, "power"));
+      break;
+    }
+  }
+}
 
-  if (strcmp(topic, "homie/nodemcu/switch-1/power/set") == 0)
-    execSwitchCmd(14, (char)payload[0] == 't', "homie/nodemcu/switch-1/power");
+void publish_homie_device_info() {
+  client.publish(deviceTopic("$state"), "init", true);
+  client.publish(deviceTopic("$homie"), "3.0.0", true);
+  client.publish(deviceTopic("$name"), "NodeMCU", true);
+  client.publish(deviceTopic("$localip"), WiFi.localIP().toString().c_str(), true);
+  client.publish(deviceTopic("$mac"), WiFi.macAddress().c_str(), true);
+  client.publish(deviceTopic("$fw/name"), "ScholliFW", true);
+  client.publish(deviceTopic("$fw/version"), "1.0", true);
+  client.publish(deviceTopic("$implementation"), "esp8266", true);
+  client.publish(deviceTopic("$stats"), "uptime", true);
 
-  if (strcmp(topic, "homie/nodemcu/switch-2/power/set") == 0)
-    execSwitchCmd(13, (char)payload[0] == 't', "homie/nodemcu/switch-2/power");
+  char tempStr1[100] = "";
+  for (int i=0; i<themoDeviceCount; i++) {
+    char tempStr2[20];
+    snprintf(tempStr2, sizeof(tempStr2), "thermometer-%d,", i);
+    strlcat(tempStr1, tempStr2, sizeof(tempStr1));
+  }
+  for (int i=0; i<SWITCH_COUNT; i++) {
+    char tempStr2[20];
+    snprintf(tempStr2, sizeof(tempStr2), "switch-%d", i);
+    strlcat(tempStr1, tempStr2, sizeof(tempStr1));
+    if (i<SWITCH_COUNT-1)
+      strlcat(tempStr1, ",", sizeof(tempStr1));
+  }
+  client.publish(deviceTopic("$nodes"), tempStr1, true);
 
-  if (strcmp(topic, "homie/nodemcu/switch-3/power/set") == 0)
-    execSwitchCmd(12, (char)payload[0] == 't', "homie/nodemcu/switch-3/power");
+  for (int i=0; i<themoDeviceCount; i++)
+    publish_homie_temperature(i);
+  for (int i=0; i<SWITCH_COUNT; i++)
+    publish_homie_switch(i, switchNames[i]);
 
-  if (strcmp(topic, "homie/nodemcu/switch-4/power/set") == 0)
-    execSwitchCmd(11, (char)payload[0] == 't', "homie/nodemcu/switch-4/power");
+  client.publish(deviceTopic("$state"), "ready", true);
+}
 
-  if (strcmp(topic, "homie/nodemcu/switch-5/power/set") == 0)
-    execSwitchCmd(10, (char)payload[0] == 't', "homie/nodemcu/switch-5/power");
+void publish_homie_temperature(unsigned int thermometer_index) {
+  char tempStr[20];
+  snprintf(tempStr, sizeof(tempStr), "Terrarium %d", thermometer_index+1);
+  client.publish(nNodeTopic("thermometer", thermometer_index, "$name"), tempStr, true);
+  client.publish(nNodeTopic("thermometer", thermometer_index, "$properties"), "temperature", true);
+  client.publish(nNodeTopic("thermometer", thermometer_index, "temperature/$name"), tempStr, true);
+  client.publish(nNodeTopic("thermometer", thermometer_index, "temperature/$unit"), "°C", true);
+  client.publish(nNodeTopic("thermometer", thermometer_index, "temperature/$datatype"), "float", true);
+}
+
+void publish_homie_switch(unsigned int switch_index, const char* name) {
+  client.publish(nNodeTopic("switch", switch_index, "$name"), name, true);
+  client.publish(nNodeTopic("switch", switch_index, "$properties"), "power", true);
+  client.publish(nNodeTopic("switch", switch_index, "power/$name"), name, true);
+  client.publish(nNodeTopic("switch", switch_index, "power/$settable"), "true", true);
+  client.publish(nNodeTopic("switch", switch_index, "power/$datatype"), "boolean", true);
 }
 
 void reconnect() {
@@ -188,75 +253,12 @@ void reconnect() {
      }
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect(mqtt_clientid, mqtt_user, mqtt_pass, "homie/nodemcu/$state", MQTTQOS1, true, "lost")) {
+    if (client.connect(mqtt_clientid, mqtt_user, mqtt_pass, deviceTopic("$state"), MQTTQOS1, true, "lost")) {
       Serial.println("connected");
-      client.publish("homie/nodemcu/$state", "init", true);
-      client.publish("homie/nodemcu/$homie", "3.0.0", true);
-      client.publish("homie/nodemcu/$name", "NodeMCU", true);
-      client.publish("homie/nodemcu/$localip", WiFi.localIP().toString().c_str(), true);
-      client.publish("homie/nodemcu/$mac", WiFi.macAddress().c_str(), true);
-      client.publish("homie/nodemcu/$fw/name", "ScholliFW", true);
-      client.publish("homie/nodemcu/$fw/version", "1.0", true);
-      client.publish("homie/nodemcu/$nodes", "thermometer-0,thermometer-1,switch-0,switch-1,switch-2,switch-3,switch-4,switch-5", true);
-      client.publish("homie/nodemcu/$implementation", "esp8266", true);
-      client.publish("homie/nodemcu/$state", "ready", true);
-
-      client.publish("homie/nodemcu/thermometer-0/$name", "Terrarium 1", true);
-      client.publish("homie/nodemcu/thermometer-0/$properties", "temperature", true);
-      client.publish("homie/nodemcu/thermometer-0/temperature/$name", "Terrarium 1", true);
-      client.publish("homie/nodemcu/thermometer-0/temperature/$unit", "°C", true);
-      client.publish("homie/nodemcu/thermometer-0/temperature/$datatype", "float", true);
-
-      client.publish("homie/nodemcu/thermometer-1/$name", "Terrarium 2", true);
-      client.publish("homie/nodemcu/thermometer-1/$properties", "temperature", true);
-      client.publish("homie/nodemcu/thermometer-1/temperature/$name", "Terrarium 2", true);
-      client.publish("homie/nodemcu/thermometer-1/temperature/$unit", "°C", true);
-      client.publish("homie/nodemcu/thermometer-1/temperature/$datatype", "float", true);
-
-      client.publish("homie/nodemcu/switch-0/$name", "Beleuchtung Terrarien", true);
-      client.publish("homie/nodemcu/switch-0/$properties", "power", true);
-      client.publish("homie/nodemcu/switch-0/power/$name", "Beleuchtung Terrarien", true);
-      client.publish("homie/nodemcu/switch-0/power/$settable", "true", true);
-      client.publish("homie/nodemcu/switch-0/power/$datatype", "boolean", true);
-
-      client.publish("homie/nodemcu/switch-1/$name", "Licht Flur EG", true);
-      client.publish("homie/nodemcu/switch-1/$properties", "power", true);
-      client.publish("homie/nodemcu/switch-1/power/$name", "Licht Flur EG", true);
-      client.publish("homie/nodemcu/switch-1/power/$settable", "true", true);
-      client.publish("homie/nodemcu/switch-1/power/$datatype", "boolean", true);
-
-      client.publish("homie/nodemcu/switch-2/$name", "Licht Wohnzimmer Stehlampe", true);
-      client.publish("homie/nodemcu/switch-2/$properties", "power", true);
-      client.publish("homie/nodemcu/switch-2/power/$name", "Licht Wohnzimmer Stehlampe", true);
-      client.publish("homie/nodemcu/switch-2/power/$settable", "true", true);
-      client.publish("homie/nodemcu/switch-2/power/$datatype", "boolean", true);
-
-      client.publish("homie/nodemcu/switch-3/$name", "Licht Flur OG", true);
-      client.publish("homie/nodemcu/switch-3/$properties", "power", true);
-      client.publish("homie/nodemcu/switch-3/power/$name", "Licht Flur OG", true);
-      client.publish("homie/nodemcu/switch-3/power/$settable", "true", true);
-      client.publish("homie/nodemcu/switch-3/power/$datatype", "boolean", true);
-
-      client.publish("homie/nodemcu/switch-4/$name", "Weihnachtsbaum", true);
-      client.publish("homie/nodemcu/switch-4/$properties", "power", true);
-      client.publish("homie/nodemcu/switch-4/power/$name", "Weihnachtsbaum", true);
-      client.publish("homie/nodemcu/switch-4/power/$settable", "true", true);
-      client.publish("homie/nodemcu/switch-4/power/$datatype", "boolean", true);
-
-      client.publish("homie/nodemcu/switch-5/$name", "Licht Wohnzimmer Tiffany", true);
-      client.publish("homie/nodemcu/switch-5/$properties", "power", true);
-      client.publish("homie/nodemcu/switch-5/power/$name", "Licht Wohnzimmer Tiffany", true);
-      client.publish("homie/nodemcu/switch-5/power/$settable", "true", true);
-      client.publish("homie/nodemcu/switch-5/power/$datatype", "boolean", true);
-
-
-      client.subscribe("homie/nodemcu/switch-0/power/set");
-      client.subscribe("homie/nodemcu/switch-1/power/set");
-      client.subscribe("homie/nodemcu/switch-2/power/set");
-      client.subscribe("homie/nodemcu/switch-3/power/set");
-      client.subscribe("homie/nodemcu/switch-4/power/set");
-      client.subscribe("homie/nodemcu/switch-5/power/set");
-
+      for (int i=0; i<SWITCH_COUNT; i++) {
+        client.subscribe(nNodeTopic("switch", i, "power/set"));
+      }
+      publish_homie_device_info();
       lightShow();
     } else {
       Serial.print("failed, rc=");
@@ -268,9 +270,16 @@ void reconnect() {
   }
 }
 
+void publish_homie_stats() {
+  char tempStr[10];
+  snprintf(tempStr, sizeof(tempStr), "%d", TEMP_REQUEST_DELAY/1000);
+  client.publish(deviceTopic("$stats/interval"), tempStr, true);
+  snprintf(tempStr, sizeof(tempStr), "%d", uptime());
+  client.publish(deviceTopic("$stats/uptime"), tempStr, true);
+}
+
 void oneWireLoop() {
-  char topic[50];
-  char tempStr[6];
+  char tempStr[10];
   
   if ( millis() - lastTempRequest >= TEMP_REQUEST_DELAY ) {
     Serial.println("Requesting temperatures...");
@@ -281,17 +290,15 @@ void oneWireLoop() {
 
   if ( (tempReqState == TEMP_REQUESTED) && (millis() - lastTempRequest >= delayInMillis) )
   {
+    publish_homie_stats();
     digitalWrite(LED_BUILTIN, LOW);
-    for (int i=0; i<deviceCount; i++) {
-      snprintf(topic, 50, "homie/nodemcu/thermometer-%d/temperature", i);
-      dtostrf(sensors.getTempC(deviceAddresses[i]), 0, 2, tempStr);
+    for (int i=0; i<themoDeviceCount; i++) {
+      char* topic = nNodeTopic("thermometer", i, "temperature");
+      snprintf(tempStr, sizeof(tempStr), "%f", sensors.getTempC(deviceAddresses[i]));
       Serial.printf("Publishing value %s to topic %s.", tempStr, topic);
       Serial.println();
       client.publish(topic, tempStr, true);
     }
-    client.publish("homie/nodemcu/$stats/interval", String(TEMP_REQUEST_DELAY/1000).c_str(), true);
-    client.publish("homie/nodemcu/$stats", "uptime", true);
-    client.publish("homie/nodemcu/$stats/uptime", String(uptime()).c_str(), true);
     digitalWrite(LED_BUILTIN, HIGH);
     tempReqState = TEMP_WAITING;
   }

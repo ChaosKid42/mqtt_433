@@ -47,6 +47,8 @@ unsigned int tempReqState = TEMP_WAITING;
 
 char topicTempString[100];
 
+bool switchStates[SWITCH_COUNT];
+
 uint32_t uptime() {
     static uint32_t low32, high32;
     uint32_t new_low32 = millis();
@@ -93,8 +95,9 @@ void setup_onewire() {
     unsigned int resolution = sensors.getResolution(deviceAddresses[i]);
     Serial.print(resolution);
     Serial.println(); 
-    if (resolution > maxResolution) 
+    if (resolution > maxResolution) {
       maxResolution = resolution;
+    }
   }
   Serial.print("Max resolution: ");
   Serial.println(maxResolution);
@@ -153,16 +156,19 @@ void lightShow() {
   digitalWrite(LED_BUILTIN, HIGH);  
 }
 
-void execSwitchCmd(byte unit, boolean switchOn, char* topic) {
-    Serial.printf("send to unit %d: %d", unit, switchOn);
-    Serial.println();
-    digitalWrite(LED_BUILTIN, LOW);
-    transmitter.sendUnit(unit, switchOn);
-    if (switchOn)
-      client.publish(topic, "true", true);
-    else
-      client.publish(topic, "false", true);
-    digitalWrite(LED_BUILTIN, HIGH);
+void execSwitchCmd(unsigned int switch_index, bool switchOn) {
+  byte unit = 15-switch_index;
+  Serial.printf("send to unit %d: %d", unit, switchOn);
+  Serial.println();
+  digitalWrite(LED_BUILTIN, LOW);
+  transmitter.sendUnit(unit, switchOn);
+  if (switchOn) {
+    client.publish(nNodeTopic("switch", switch_index, "power"), "true", true);
+  } else {
+    client.publish(nNodeTopic("switch", switch_index, "power"), "false", true);
+  }
+  switchStates[switch_index] = switchOn;
+  digitalWrite(LED_BUILTIN, HIGH);
 }
 
 char* deviceTopic(const char* postfix) {
@@ -177,7 +183,7 @@ char* nNodeTopic(const char* node, unsigned int i, const char* postfix) {
   return topicTempString;
 }
 
-void callback(char* topic, byte* payload, unsigned int length) {
+void callback(const char* topic, byte* payload, unsigned int length) {
   Serial.printf("Message arrived with length %d [", length);
   Serial.print(topic);
   Serial.print("] ");
@@ -188,8 +194,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   for (int i = 0; i < SWITCH_COUNT; i++) {
     if (strcmp(topic, nNodeTopic("switch", i, "power/set")) == 0) {
-      execSwitchCmd(15-i, (char)payload[0] == 't', nNodeTopic("switch", i, "power"));
-      break;
+      execSwitchCmd(i, (char)payload[0] == 't');
+    }
+    if (strcmp(topic, nNodeTopic("switch", i, "power")) == 0) {
+      switchStates[i] = (char)payload[0] == 't';
     }
   }
 }
@@ -215,15 +223,16 @@ void publish_homie_device_info() {
     char tempStr2[20];
     snprintf(tempStr2, sizeof(tempStr2), "switch-%d", i);
     strlcat(tempStr1, tempStr2, sizeof(tempStr1));
-    if (i<SWITCH_COUNT-1)
-      strlcat(tempStr1, ",", sizeof(tempStr1));
+    if (i<SWITCH_COUNT-1) strlcat(tempStr1, ",", sizeof(tempStr1));
   }
   client.publish(deviceTopic("$nodes"), tempStr1, true);
 
-  for (int i=0; i<themoDeviceCount; i++)
+  for (int i=0; i<themoDeviceCount; i++) {
     publish_homie_temperature(i);
-  for (int i=0; i<SWITCH_COUNT; i++)
+  }
+  for (int i=0; i<SWITCH_COUNT; i++) {
     publish_homie_switch(i, switchNames[i]);
+  }
 
   client.publish(deviceTopic("$state"), "ready", true);
 }
@@ -255,10 +264,11 @@ void reconnect() {
      }
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect(mqtt_clientid, mqtt_user, mqtt_pass, deviceTopic("$state"), MQTTQOS1, true, "lost")) {
+    if (client.connect(mqtt_clientid, mqtt_user, mqtt_pass, deviceTopic("$state"), 1, true, "lost")) {
       Serial.println("connected");
       for (int i=0; i<SWITCH_COUNT; i++) {
-        client.subscribe(nNodeTopic("switch", i, "power/set"));
+        client.subscribe(nNodeTopic("switch", i, "power"), 1);
+        client.subscribe(nNodeTopic("switch", i, "power/set"), 1);
       }
       publish_homie_device_info();
       lightShow();
@@ -280,6 +290,16 @@ void publish_homie_stats() {
   client.publish(deviceTopic("$stats/uptime"), tempStr, true);
 }
 
+void publish_switch_states() {
+  for (int i=0; i<SWITCH_COUNT; i++) {
+    if (switchStates[i]) {
+      client.publish(nNodeTopic("switch", i, "power"), "true", true);
+    } else {
+      client.publish(nNodeTopic("switch", i, "power"), "false", true);
+    }
+  }
+}
+
 void oneWireLoop() {
   char tempStr[10];
   
@@ -293,6 +313,7 @@ void oneWireLoop() {
   if ( (tempReqState == TEMP_REQUESTED) && (millis() - lastTempRequest >= delayInMillis) )
   {
     publish_homie_stats();
+    publish_switch_states();
     digitalWrite(LED_BUILTIN, LOW);
     for (int i=0; i<themoDeviceCount; i++) {
       char* topic = nNodeTopic("thermometer", i, "temperature");

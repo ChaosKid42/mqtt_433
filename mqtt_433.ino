@@ -268,6 +268,7 @@ void reconnect() {
       Serial.println("connected");
       for (int i=0; i<SWITCH_COUNT; i++) {
         client.subscribe(nNodeTopic("switch", i, "power"), 1);
+        client.unsubscribe(nNodeTopic("switch", i, "power"));
         client.subscribe(nNodeTopic("switch", i, "power/set"), 1);
       }
       publish_homie_device_info();

@@ -179,7 +179,7 @@ char* deviceTopic(const char* postfix) {
 
 char* nNodeTopic(const char* node, unsigned int i, const char* postfix) {
   // e.g. "homie/nodemcu/switch-0/power/set"
-  snprintf(topicTempString, sizeof(topicTempString), "%s/%s-%d/%s", HOMIE_DEVICE_PREFIX, node, i, postfix);
+  snprintf(topicTempString, sizeof(topicTempString), "%s/%s%d/%s", HOMIE_DEVICE_PREFIX, node, i, postfix);
   return topicTempString;
 }
 
@@ -204,24 +204,19 @@ void callback(const char* topic, byte* payload, unsigned int length) {
 
 void publish_homie_device_info() {
   client.publish(deviceTopic("$state"), "init", true);
-  client.publish(deviceTopic("$homie"), "3.0.0", true);
+  client.publish(deviceTopic("$homie"), "4.0", true);
   client.publish(deviceTopic("$name"), "NodeMCU", true);
-  client.publish(deviceTopic("$localip"), WiFi.localIP().toString().c_str(), true);
-  client.publish(deviceTopic("$mac"), WiFi.macAddress().c_str(), true);
-  client.publish(deviceTopic("$fw/name"), "ScholliFW", true);
-  client.publish(deviceTopic("$fw/version"), "1.0", true);
-  client.publish(deviceTopic("$implementation"), "esp8266", true);
-  client.publish(deviceTopic("$stats"), "uptime", true);
+  client.publish(deviceTopic("$state"), "ready", true);
 
   char tempStr1[100] = "";
   for (int i=0; i<themoDeviceCount; i++) {
     char tempStr2[20];
-    snprintf(tempStr2, sizeof(tempStr2), "thermometer-%d,", i);
+    snprintf(tempStr2, sizeof(tempStr2), "thermometer%d,", i);
     strlcat(tempStr1, tempStr2, sizeof(tempStr1));
   }
   for (int i=0; i<SWITCH_COUNT; i++) {
     char tempStr2[20];
-    snprintf(tempStr2, sizeof(tempStr2), "switch-%d", i);
+    snprintf(tempStr2, sizeof(tempStr2), "switch%d", i);
     strlcat(tempStr1, tempStr2, sizeof(tempStr1));
     if (i<SWITCH_COUNT-1) strlcat(tempStr1, ",", sizeof(tempStr1));
   }
@@ -283,14 +278,6 @@ void reconnect() {
   }
 }
 
-void publish_homie_stats() {
-  char tempStr[10];
-  snprintf(tempStr, sizeof(tempStr), "%d", TEMP_REQUEST_DELAY/1000);
-  client.publish(deviceTopic("$stats/interval"), tempStr, true);
-  snprintf(tempStr, sizeof(tempStr), "%d", uptime());
-  client.publish(deviceTopic("$stats/uptime"), tempStr, true);
-}
-
 void publish_switch_states() {
   for (int i=0; i<SWITCH_COUNT; i++) {
     if (switchStates[i]) {
@@ -298,6 +285,7 @@ void publish_switch_states() {
     } else {
       client.publish(nNodeTopic("switch", i, "power"), "false", true);
     }
+    publish_homie_switch(i, switchNames[i]);
   }
 }
 
@@ -313,7 +301,6 @@ void oneWireLoop() {
 
   if ( (tempReqState == TEMP_REQUESTED) && (millis() - lastTempRequest >= delayInMillis) )
   {
-    publish_homie_stats();
     publish_switch_states();
     digitalWrite(LED_BUILTIN, LOW);
     for (int i=0; i<themoDeviceCount; i++) {
@@ -321,6 +308,7 @@ void oneWireLoop() {
       snprintf(tempStr, sizeof(tempStr), "%f", sensors.getTempC(deviceAddresses[i]));
       Serial.printf("Publishing value %s to topic %s.\n", tempStr, topic);
       client.publish(topic, tempStr, true);
+      publish_homie_temperature(i);
     }
     digitalWrite(LED_BUILTIN, HIGH);
     tempReqState = TEMP_WAITING;
